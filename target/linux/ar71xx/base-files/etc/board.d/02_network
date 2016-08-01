@@ -83,6 +83,11 @@ airgatewaypro)
 		"0@eth0" "4:lan" "5:wan"
 	;;
 
+rb-941-2nd)
+	ucidef_add_switch "switch0" \
+		"0@eth0" "1:lan" "2:lan" "3:lan" "4:wan"
+	;;
+
 db120 |\
 rb-2011l | \
 rb-2011uas |\
