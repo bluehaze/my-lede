@@ -166,3 +166,8 @@ define Build/sysupgrade-tar
 		--rootfs $(call param_get_default,rootfs,$(1),$(IMAGE_ROOTFS)) \
 		$@
 endef
+
+define Build/kernel2minor
+	$(STAGING_DIR_HOST)/bin/kernel2minor -k $@ -r $@.new $(1)
+	@mv $@.new $@
+endef
