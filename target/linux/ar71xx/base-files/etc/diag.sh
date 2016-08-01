@@ -246,7 +246,7 @@ get_status_led() {
 	rb-411 | rb-411u | rb-433 | rb-433u | rb-450 | rb-450g | rb-493)
 		status_led="rb4xx:yellow:user"
 		;;
-	rb-750)
+	rb-750 | rb-751)
 		status_led="rb750:green:act"
 		;;
 	rb-911g-2hpnd|\
@@ -256,7 +256,7 @@ get_status_led() {
 	rb-912uag-5hpnd)
 		status_led="rb:green:user"
 		;;
-	rb-951ui-2hnd)
+	rb-951ui-2hnd | rb-941-2nd)
 		status_led="rb:green:act"
 		;;
 	rb-sxt2n|\
