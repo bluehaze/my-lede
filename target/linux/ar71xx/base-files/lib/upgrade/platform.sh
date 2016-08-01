@@ -46,6 +46,7 @@ platform_do_upgrade_combined() {
 	local erase_size=$((0x${partitions%%:*})); partitions="${partitions#*:}"
 	local kern_length=0x$(dd if="$1" bs=2 skip=1 count=4 2>/dev/null)
 	local kern_blocks=$(($kern_length / $CI_BLKSZ))
+	local kern_magic_id=$(dd if="$1" bs=1 skip=$CI_BLKSZ count=8 2>/dev/null)
 	local root_blocks=$((0x$(dd if="$1" bs=2 skip=5 count=4 2>/dev/null) / $CI_BLKSZ))
 
 	if [ -n "$partitions" ] && [ -n "$kernelpart" ] && \
@@ -53,12 +54,17 @@ platform_do_upgrade_combined() {
 	   [ ${root_blocks:-0} -gt 0 ] && \
 	   [ ${erase_size:-0} -gt 0 ];
 	then
+		local rootfspart=$(platform_find_rootfspart "$partitions" "$kernelpart")
 		local append=""
 		[ -f "$CONF_TAR" -a "$SAVE_CONFIG" -eq 1 ] && append="-j $CONF_TAR"
 
-		( dd if="$1" bs=$CI_BLKSZ skip=1 count=$kern_blocks 2>/dev/null; \
-		  dd if="$1" bs=$CI_BLKSZ skip=$((1+$kern_blocks)) count=$root_blocks 2>/dev/null ) | \
-			mtd -r $append -F$kernelpart:$kern_length:$CI_LDADR,rootfs write - $partitions
+		if [ "$kern_magic_id" != "MIKROTIK" ]; then
+			( dd if="$1" bs=$CI_BLKSZ skip=1 count=$kern_blocks 2>/dev/null; \
+			  dd if="$1" bs=$CI_BLKSZ skip=$((1+$kern_blocks)) count=$root_blocks 2>/dev/null ) | \
+				mtd -r $append -F$kernelpart:$kern_length:$CI_LDADR,rootfs write - $partitions
+		elif [ -n "$rootfspart" ]; then
+			platform_do_upgrade_combined_mikrotik_helper "$1" "$kernelpart" "$kern_blocks" "$rootfspart" "$root_blocks" "$append"
+		fi
 	fi
 }
 
@@ -482,6 +488,11 @@ platform_check_image() {
 		nand_do_platform_check $board $1
 		return $?;
 		;;
+	rb-941-2nd | \
+	rb-411 | rb-411u | rb-433 | rb-433u | rb-435g | rb-450 | rb-450g | rb-493 | rb-493g | \
+	rb-750 | rb-750gl | rb-751 | rb-751g | rb-911g-2hpnd | rb-911g-5hpnd | rb-911g-5hpacd | \
+	rb-912uag-2hpnd | rb-912uag-5hpnd | rb-951g-2hnd | rb-951ui-2hnd | rb-2011l | rb-2011uas | \
+	rb-2011uias | rb-2011uas-2hnd | rb-2011uias-2hnd | rb-sxt2n | rb-sxt5n | \
 	routerstation | \
 	routerstation-pro | \
 	ls-sr71 | \
@@ -542,6 +553,16 @@ platform_pre_upgrade() {
 	wndr4300 )
 		nand_do_upgrade "$1"
 		;;
+	rb-411 | rb-411u | rb-433 | rb-433u | rb-435g | rb-450 | rb-450g | rb-493 | rb-493g | \
+	rb-750 | rb-750gl | rb-751 | rb-751g | rb-911g-2hpnd | rb-911g-5hpnd | rb-911g-5hpacd | \
+	rb-912uag-2hpnd | rb-912uag-5hpnd | rb-951g-2hnd | rb-951ui-2hnd | rb-2011l | rb-2011uas | \
+	rb-2011uias | rb-2011uas-2hnd | rb-2011uias-2hnd | rb-sxt2n | rb-sxt5n)
+		nand_upgrade_mikrotik_yaffs2_kernel "$1" || {
+			echo "Mikrotik Nand upgrade failed"
+			exit 1
+		}
+		nand_do_upgrade "$1"
+		;;
 	mr18)
 		merakinand_do_upgrade "$1"
 		;;
@@ -552,6 +573,7 @@ platform_do_upgrade() {
 	local board=$(ar71xx_board_name)
 
 	case "$board" in
+	rb-941-2nd | \
 	routerstation | \
 	routerstation-pro | \
 	ls-sr71 | \

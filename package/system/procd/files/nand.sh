@@ -98,11 +98,22 @@ nand_restore_config() {
 	sync
 	local ubidev=$( nand_find_ubi $CI_UBIPART )
 	local ubivol="$( nand_find_volume $ubidev rootfs_data )"
+	local rootfs_type=${2:-ubifs}
 	[ ! "$ubivol" ] &&
 		ubivol="$( nand_find_volume $ubidev rootfs )"
+	local datavol="$ubivol"
+	[ "$rootfs_type" != "ubifs" ] && {
+		local dataindex="$( find_mtd_index "rootfs_data" )"
+		datavol="mtdblock$dataindex"
+		[ -n "$dataindex" -a -e "/dev/$datavol" ] || {
+			echo "Can't find mtd block device for rootfs_data"
+			return 1
+		}
+		mtd erase rootfs_data
+	}
 	mkdir /tmp/new_root
-	if ! mount -t ubifs /dev/$ubivol /tmp/new_root; then
-		echo "mounting ubifs $ubivol failed"
+	if ! mount -t "$rootfs_type" /dev/$datavol /tmp/new_root; then
+		echo "mounting $rootfs_type $ubivol failed"
 		rmdir /tmp/new_root
 		return 1
 	fi
@@ -196,7 +207,7 @@ nand_do_upgrade_success() {
 	local conf_tar="/tmp/sysupgrade.tgz"
 	
 	sync
-	[ -f "$conf_tar" ] && nand_restore_config "$conf_tar"
+	[ -f "$conf_tar" ] && nand_restore_config "$conf_tar" "$1"
 	echo "sysupgrade successful"
 	reboot -f
 }
@@ -284,6 +295,7 @@ nand_do_upgrade_stage2() {
 	case "$file_type" in
 		"ubi")		nand_upgrade_ubinized $1;;
 		"ubifs")	nand_upgrade_ubifs $1;;
+		"combined")	nand_upgrade_combined $1;;
 		*)		nand_upgrade_tar $1;;
 	esac
 }
